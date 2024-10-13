@@ -1,19 +1,14 @@
-require('dotenv').config();
-const { Telegraf } = require('telegraf');
-const mongoose = require('mongoose');
-const next = require('next');
+import { Telegraf } from 'telegraf';
+import mongoose from 'mongoose';
 
-// MongoDB connection URI
+// MongoDB connection URI and bot token from environment variables
 const mongoURI = process.env.MONGODB_URI;
+const botToken = process.env.BOT_TOKEN;
 
 // Connect to MongoDB
 mongoose.connect(mongoURI)
-    .then(() => {
-        console.log('MongoDB connected successfully');
-    })
-    .catch(err => {
-        console.error('MongoDB connection error:', err);
-    });
+    .then(() => console.log('MongoDB connected successfully'))
+    .catch(err => console.error('MongoDB connection error:', err));
 
 // Define a schema and model for users
 const userSchema = new mongoose.Schema({
@@ -23,10 +18,11 @@ const userSchema = new mongoose.Schema({
     last_name: String,
 });
 
+// Avoid OverwriteModelError by checking if the model exists
 const User = mongoose.models.User || mongoose.model('User', userSchema);
 
 // Initialize the bot with your token
-const bot = new Telegraf(process.env.BOT_TOKEN);
+const bot = new Telegraf(botToken);
 
 // Middleware to handle new users
 bot.start(async (ctx) => {
@@ -37,8 +33,10 @@ bot.start(async (ctx) => {
         last_name: ctx.from.last_name,
     };
 
+    // Check if the user already exists
     const existingUser = await User.findOne({ id: userData.id });
     if (!existingUser) {
+        // Save the new user to the database
         const newUser = new User(userData);
         await newUser.save();
         console.log('New user added:', userData);
@@ -59,31 +57,22 @@ bot.command('listusers', async (ctx) => {
     }
 });
 
-// Launch the bot once at startup
-bot.launch().then(() => {
-    console.log('Bot is running...');
-}).catch((err) => {
-    console.error('Error launching the bot:', err);
-});
+// Export a function to handle requests
+export default async function handler(req, res) {
+    if (req.method === 'POST') {
+        try {
+            await bot.launch();  // Launch the bot only on a POST request
+            return res.status(200).json({ message: 'Bot is running!' });
+        } catch (error) {
+            console.error('Error launching the bot:', error);
+            return res.status(500).json({ error: 'Failed to launch the bot.' });
+        }
+    } else {
+        res.setHeader('Allow', ['POST']);
+        return res.status(405).end(`Method ${req.method} Not Allowed`);
+    }
+}
 
 // Handle graceful shutdown
 process.once('SIGINT', () => bot.stop('SIGINT'));
 process.once('SIGTERM', () => bot.stop('SIGTERM'));
-
-// Next.js setup
-const app = next({ dev: process.env.NODE_ENV !== 'production' });
-const handle = app.getRequestHandler();
-
-app.prepare().then(() => {
-    const express = require('express');
-    const server = express();
-
-    server.all('*', (req, res) => {
-        return handle(req, res);
-    });
-
-    server.listen(3000, (err) => {
-        if (err) throw err;
-        console.log('> Ready on http://localhost:3000');
-    });
-});
