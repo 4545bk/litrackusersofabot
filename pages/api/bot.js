@@ -61,20 +61,28 @@ bot.command('listusers', async (ctx) => {
     }
 });
 
-// Launch the bot only once
+// Flag to ensure the bot is only launched once
+let isBotRunning = false;
+
+// Function to launch the bot only once
 const launchBot = async () => {
-    try {
-        await bot.launch();
-        console.log('Bot is running...');
-    } catch (err) {
-        console.error('Error launching the bot:', err);
+    if (!isBotRunning) {
+        try {
+            await bot.launch();
+            isBotRunning = true;
+            console.log('Bot is running...');
+        } catch (err) {
+            console.error('Error launching the bot:', err);
+        }
+    } else {
+        console.log('Bot is already running');
     }
 };
 
 // API handler for both GET and POST requests
 export default async function handler(req, res) {
     if (req.method === 'POST') {
-        // Launch the bot for POST requests
+        // Launch the bot only if it's not already running
         await launchBot();
         return res.status(200).json({ message: 'Bot is running!' });
     } else if (req.method === 'GET') {
