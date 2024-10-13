@@ -57,6 +57,45 @@ bot.command('listusers', async (ctx) => {
     }
 });
 
+// Help Command
+bot.command('help', (ctx) => {
+    ctx.reply(`Available commands:\n/start - Start the bot\n/listusers - List all registered users\n/help - Show this help message\n/echo [message] - Echo back the message you send\n/broadcast [message] - Send a message to all users`);
+});
+
+// Echo Functionality
+bot.command('echo', (ctx) => {
+    const message = ctx.message.text.split(' ').slice(1).join(' ');
+    if (message) {
+        ctx.reply(message);
+    } else {
+        ctx.reply('Please provide a message to echo. Usage: /echo [your message]');
+    }
+});
+
+// Broadcast Functionality
+bot.command('broadcast', async (ctx) => {
+    const message = ctx.message.text.split(' ').slice(1).join(' ');
+    if (!message) {
+        return ctx.reply('Please provide a message to broadcast. Usage: /broadcast [your message]');
+    }
+
+    const users = await User.find({});
+    if (users.length === 0) {
+        return ctx.reply('No users to send the message to.');
+    }
+
+    // Send message to all users
+    users.forEach(async (user) => {
+        try {
+            await bot.telegram.sendMessage(user.id, message);
+        } catch (error) {
+            console.error(`Failed to send message to user ${user.id}:`, error);
+        }
+    });
+
+    ctx.reply('Message sent to all registered users.');
+});
+
 // Export a function to handle requests
 export default async function handler(req, res) {
     if (req.method === 'POST') {
